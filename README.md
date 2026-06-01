@@ -1,91 +1,84 @@
 # srvcs-covariance
 
-Statistics microservice for srvcs.cloud: computes the **population covariance** of
-two equal-length lists of numbers.
+## Name
 
-This service is an **orchestrator**. It owns the control flow but delegates every
-arithmetic step to its dependencies. It does not validate inputs itself —
-validation propagates from its dependencies (their `422`s are forwarded).
+| Field | Value |
+| --- | --- |
+| Service | `srvcs-covariance` |
+| Slug | `covariance` |
+| Repository | `srvcs/covariance` |
+| Package | `srvcs-covariance` |
+| Kind | `orchestrator` |
 
-## Concern
+## Function
 
-`statistics: population covariance`
+statistics: population covariance
 
 ## Dependencies
 
-- `srvcs-sum` — total of a list (integer `result`)
-- `srvcs-floatdivide` — `a / b`
-- `srvcs-floatsubtract` — `a - b`
-- `srvcs-floatmultiply` — `a * b`
-- `srvcs-floatadd` — `a + b`
+| Dependency | Repository |
+| --- | --- |
+| `srvcs-sum` | [srvcs/sum](https://github.com/srvcs/sum) |
+| `srvcs-floatdivide` | [srvcs/floatdivide](https://github.com/srvcs/floatdivide) |
+| `srvcs-floatsubtract` | [srvcs/floatsubtract](https://github.com/srvcs/floatsubtract) |
+| `srvcs-floatmultiply` | [srvcs/floatmultiply](https://github.com/srvcs/floatmultiply) |
+| `srvcs-floatadd` | [srvcs/floatadd](https://github.com/srvcs/floatadd) |
 
 ## API
 
-### `GET /`
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/` | Service identity |
+| `POST` | `/` | Evaluate the service function |
+| `GET` | `/healthz` | Liveness probe |
+| `GET` | `/readyz` | Readiness probe |
+| `GET` | `/metrics` | Prometheus metrics |
+| `GET` | `/openapi.json` | OpenAPI document |
 
-Service identity.
+## Inputs
 
-```json
-{
-  "service": "srvcs-covariance",
-  "concern": "statistics: population covariance",
-  "depends_on": [
-    "srvcs-sum",
-    "srvcs-floatdivide",
-    "srvcs-floatsubtract",
-    "srvcs-floatmultiply",
-    "srvcs-floatadd"
-  ]
-}
-```
+| Name | Type | Required |
+| --- | --- | --- |
+| `a` | `json[]` | yes |
+| `b` | `json[]` | yes |
 
-### `POST /`
+## Outputs
 
-Request:
-
-```json
-{ "a": [1, 2, 3], "b": [1, 2, 3] }
-```
-
-Response `200`:
-
-```json
-{ "a": [1, 2, 3], "b": [1, 2, 3], "result": 0.6666666666666666 }
-```
-
-## Algorithm
-
-Given lists `a` and `b` with `n = a.len()` (which must equal `b.len()`; empty or
-mismatched -> `422`):
-
-1. `meanA = floatdivide(sum(a), n)`
-2. `meanB = floatdivide(sum(b), n)`
-3. `s = 0.0`; for each `i`:
-   - `da = floatsubtract(a[i], meanA)`
-   - `db = floatsubtract(b[i], meanB)`
-   - `p = floatmultiply(da, db)`
-   - `s = floatadd(s, p)`
-4. `result = floatdivide(s, n)`
-
-`result` is an `f64`. For example,
-`covariance([1, 2, 3], [1, 2, 3]) = 0.6666666666666666`.
-
-## Status codes
-
-- `200` — computed covariance
-- `422` — empty/mismatched lists, or a dependency rejected an input (forwarded)
-- `500` — a dependency returned a malformed result
-- `503` — a dependency is unavailable
+| Name | Type |
+| --- | --- |
+| `a` | `json[]` |
+| `b` | `json[]` |
+| `result` | `number` |
 
 ## Configuration
 
-| Variable                  | Default                  | Description                        |
-| ------------------------- | ------------------------ | ---------------------------------- |
-| `SRVCS_BIND_ADDR`         | `0.0.0.0:8080`           | Listen address (`host:port`).      |
-| `SRVCS_SUM_URL`           | `http://127.0.0.1:8090`  | Base URL of `srvcs-sum`.           |
-| `SRVCS_FLOATDIVIDE_URL`   | `http://127.0.0.1:8091`  | Base URL of `srvcs-floatdivide`.   |
-| `SRVCS_FLOATSUBTRACT_URL` | `http://127.0.0.1:8092`  | Base URL of `srvcs-floatsubtract`. |
-| `SRVCS_FLOATMULTIPLY_URL` | `http://127.0.0.1:8093`  | Base URL of `srvcs-floatmultiply`. |
-| `SRVCS_FLOATADD_URL`      | `http://127.0.0.1:8094`  | Base URL of `srvcs-floatadd`.      |
-| `RUST_LOG`                | `info,tower_http=info`   | Log filter.                        |
-| `SRVCS_ENV`               | `development`            | Environment label.                 |
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `SRVCS_BIND_ADDR` | `0.0.0.0:8080` | Bind address |
+| `SRVCS_ENV` | `development` | Environment label for logs |
+| `RUST_LOG` | `info,tower_http=info` | Tracing filter |
+| `SRVCS_FLOATADD_URL` | `http://127.0.0.1:8094` | Base URL for srvcs-floatadd |
+| `SRVCS_FLOATDIVIDE_URL` | `http://127.0.0.1:8091` | Base URL for srvcs-floatdivide |
+| `SRVCS_FLOATMULTIPLY_URL` | `` | Base URL for srvcs-floatmultiply |
+| `SRVCS_FLOATSUBTRACT_URL` | `` | Base URL for srvcs-floatsubtract |
+| `SRVCS_SUM_URL` | `http://127.0.0.1:8090` | Base URL for srvcs-sum |
+
+## Error Behavior
+
+- `422` means the request could not be evaluated for the documented input shape.
+- `503` means a required dependency was unavailable or returned an unexpected response.
+- Dependency validation errors are forwarded when this service delegates validation.
+
+## Local Checks
+
+```sh
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+cargo test
+```
+
+See the [srvcs service standard](https://github.com/srvcs/platform/blob/main/STANDARD.md) for the full operational contract.
+
+## Metadata
+
+Machine-readable service metadata lives in `srvcs.yaml`. Keep it aligned with this README when the service contract changes.
